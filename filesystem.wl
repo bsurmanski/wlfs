@@ -123,7 +123,7 @@ class Filesystem {
         return header
     }
 
-    uint write(void^ ptr, uint sz, StreamInfo^ stream) {
+    int write(void^ ptr, uint sz, StreamInfo^ stream) {
         char[512] sector
 
         .disk.readSector(.getFirstSectorOfCluster(stream.cluster), sector.ptr)
@@ -167,7 +167,7 @@ class Filesystem {
         return sz
     }
 
-    uint read(void ^ptr, uint sz, StreamInfo^ stream) {
+    int read(void ^ptr, uint sz, StreamInfo^ stream) {
         char[512] sector
 
         .disk.readSector(.getFirstSectorOfCluster(stream.cluster), sector.ptr)
@@ -423,7 +423,7 @@ class Filesystem {
         printf("\n")
         if(info.attributes & FILEATTR_DIR) {
             StreamInfo stream = StreamInfo(info.startCluster)
-            uint child = -1
+            int child = -1
             while(.read(&child, uint.sizeof, &stream)) {
                 if(child < 0) break
                 .dump(child, indent + 1)
@@ -431,19 +431,68 @@ class Filesystem {
         }
     }
 
-    int remove(int clusterid) {
-        BootBlock bootblock = .readBootBlock()
+    void print() {
+        .dump(0, 0)
+    }
 
+    int deallocCluster(int clusterid) {
         char[512] sector
-        int sectorid = .getFirstSectorOfCluster(bootblock.clusterTableLoc)
-        .disk.readSector(sectorid, sector.ptr)
-        ClusterHeader^ head = void^: &sector[0]
+        .disk.readSector(.getFirstSectorOfCluster(clusterid), sector.ptr)
+        ClusterHeader head
+        memcpy(&head, sector.ptr, ClusterHeader.sizeof)
+        
+        if(head.next > 0) .deallocCluster(head.next)
+
+        StreamInfo stream = StreamInfo(.bootBlock.clusterTableLoc)
+        .seek(clusterid / 2, &stream)
+        StreamInfo peek = stream
+        char c
+        .read(&c, 1, &peek)
+        if(clusterid % 2) {
+            c = c & 0xf0
+        } else {
+            c = c & 0x0f
+        }
+        .write(&c, 1, &stream)
+    }
+
+    void deallocFile(int fileid) {
+        FileInfo info = .getFileInfo(fileid)
+        if(info.attributes & FILEATTR_DIR) {
+            StreamInfo stream = StreamInfo(info.startCluster)
+            int child = -1
+            while(.read(&child, uint.sizeof, &stream)) {
+                if(child > 0) {
+                    .deallocFile(child)
+                }
+            }
+        }
+        .deallocCluster(info.startCluster)
     }
 
     void appendToDirectory(FileInfo directory, FileInfo file) {
         StreamInfo stream = .open(directory, STREAM_APPEND)
         .write(&file.fileId, uint.sizeof, &stream)
         .writeFileInfo(file)
+    }
+
+    void remove(uint parent, uint child) {
+        char[512] sector
+        FileInfo parentInfo = .getFileInfo(parent)
+        if(!(parentInfo.attributes & FILEATTR_DIR)) return
+
+        StreamInfo stream = StreamInfo(parentInfo.startCluster)
+        StreamInfo peek = stream
+        uint dirent = -1
+        while(.read(&dirent, int.sizeof, &peek)) {
+            if(dirent == child) {
+                dirent = 0xffffffff
+                .write(&dirent, int.sizeof, &stream)
+            }
+            stream = peek
+        }
+
+        .deallocFile(child)
     }
 
     uint create(uint parent, char^ filenm, char attributes) {

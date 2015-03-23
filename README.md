@@ -85,7 +85,8 @@ The first entry in the file table is the root directory
 
     
 ### Directories
-directories are represented as a list of File Info Entries. Directories
-are still files, and can be broken into multiple clusters. Each cluster of a
-directory has a Cluster Header. There is no sort order to directory entries
+directories are represented as a list of 4 byte (int) indices into the FileTable. 
+Directories are still files, and can be broken into multiple clusters. 
+Each cluster of a directory has a Cluster Header. There is no sort order to directory entries.
 
+A value of 0xffff as a fileId entry is an invalid file (file has been removed)

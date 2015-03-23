@@ -1,13 +1,17 @@
 # WLFS
-## A Simple Filesystem vaguely based off of the FAT Filesystem
+## A Simple Filesystem Emulation
+vaguely based off of the FAT, and EXT4 Filesystems.
+
+Written in the [OWL programming language](https://www.github.com/bsurmanski/wlc).
 
 ## Structure
 
 512 bytes: superblock padding
-Cluster 0 (offset 512): Boot Superblock
-Cluster \*: Cluster Table (first cluster sector)
-Cluster \*: file list
-Cluster \*: Data sectors
+
+    Cluster 0 (offset 512): Boot Superblock
+    Cluster \*: Cluster Table (first cluster sector)
+    Cluster \*: file list
+    Cluster \*: Data sectors
 
 ### Clusters
 Clusters are a contiguous allocation unit of disk space. A cluster spans
@@ -55,6 +59,7 @@ entries is implicit by their location.
     4 bits: cluster bit vector
 
 possible cluster flags:
+
 * 0x1: cluster allocated
 * 0x2: sustem cluster
 * 0x4: ?
